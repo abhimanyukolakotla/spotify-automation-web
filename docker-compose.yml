@@ -1,0 +1,57 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: localhost/spotify-backend:latest
+    pull_policy: never
+    #platform: linux/amd64
+    container_name: spotify-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      # Set these in your .env file when deploying.
+      # APP_BACKEND_URL  – public URL of this backend,  e.g. https://api.example.com
+      # APP_FRONTEND_URL – public URL of the frontend,  e.g. https://app.example.com
+      APP_BACKEND_URL: ${APP_BACKEND_URL:-http://127.0.0.1:8080}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://127.0.0.1:3000}
+    volumes:
+      - h2-data:/app/data
+    networks:
+      - spotify-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/auth/me || true"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: ${APP_BACKEND_URL:-}
+    image: localhost/spotify-frontend:latest
+    pull_policy: never
+    #platform: linux/amd64
+    container_name: spotify-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - spotify-net
+
+volumes:
+  h2-data:
+    driver: local
+
+networks:
+  spotify-net:
+    driver: bridge
